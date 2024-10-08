@@ -63,7 +63,7 @@ To upload a file to Azure Blob Storage, use the following command:
 This command will upload the specified file to the blob container defined in the script.
 ### Example
 ```bash
-  ./clouduploader ~/Documents/report.pdf
+  ./clouduploader.sh ~/Documents/report.pdf
   ```
 The file report.pdf will be uploaded to your Azure Blob container.
 
