@@ -57,7 +57,3 @@ else
     exit 1
 fi
 
-# Commit the changes to the repository
-git add /workspaces/CloudUploader-CLI/clouduploader.sh
-git commit -m "Add clouduploader script for uploading files to Azure Blob Storage"
-git push
