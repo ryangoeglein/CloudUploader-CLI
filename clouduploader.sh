@@ -33,7 +33,7 @@ az storage blob exists \
 
 # Prompt for overwriting if file exists
 if [ $? -eq 0 ]; then
-    read -p "File is currently within Azure Blob Storage. Would you like to upload? (y/n): " choice
+    read -p "Upload to Azure Blob Storage? Confirm Upload. (y/n): " choice
     case "$choice" in 
       y|Y ) echo "Uploading now...";;
       n|N ) echo "Skipping upload."; exit 0;;
