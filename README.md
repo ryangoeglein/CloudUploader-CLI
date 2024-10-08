@@ -18,8 +18,8 @@ Before you start, ensure you have the following:
 
 ### 1. **Clone the Repository**
 ```bash
-git clone https://github.com/yourusername/clouduploader.git
-cd clouduploader
+git clone https://github.com/ryangoeglein/CloudUploader-CLI.git
+cd CloudUploader_CLI
 ```
 ### 2. **Azure Blob Storage Setup**
 Make sure you have an Azure Storage account and a Blob container ready for uploads. If not, follow these steps:
@@ -58,7 +58,7 @@ Before running the script, authenticate to Azure using the Azure CLI:
 ### Basic Command
 To upload a file to Azure Blob Storage, use the following command:
 ```bash
-  ./clouduploader /path/to/file.txt
+  ./clouduploader.sh /path/to/file.txt
   ```
 This command will upload the specified file to the blob container defined in the script.
 ### Example
