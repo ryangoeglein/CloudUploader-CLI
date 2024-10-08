@@ -35,8 +35,7 @@ use_existing_account() {
     read -sp "Enter your Azure Storage account access key: " STORAGE_KEY
     echo
     read -p "Enter your Azure storage container name: " CONTAINER_NAME
-    read -p "Enter the file path to upload: " FILE_PATH
-    validate_file "$FILE_PATH"
+    prompt_file_path
 }
 
 # Function to create a new storage account
@@ -52,16 +51,19 @@ create_storage_account() {
     read -p "Enter a new storage container name: " CONTAINER_NAME
     az storage container create --name "$CONTAINER_NAME" --account-name "$STORAGE_ACCOUNT" --account-key "$STORAGE_KEY"
 
-    read -p "Enter the file path to upload: " FILE_PATH
-    validate_file "$FILE_PATH"
+    prompt_file_path
 }
 
-# Function to validate if file exists
-validate_file() {
-    if [ ! -f "$1" ]; then
-        echo "File not found: $1"
-        exit 1
-    fi
+# Function to prompt for file path and validate if file exists
+prompt_file_path() {
+    while true; do
+        read -p "Enter the file path to upload: " FILE_PATH
+        if [ -f "$FILE_PATH" ]; then
+            break
+        else
+            echo "File not found: $FILE_PATH. Please enter a valid file path."
+        fi
+    done
 }
 
 # Function to upload file to Azure Blob Storage
