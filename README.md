@@ -26,7 +26,7 @@ Before you start, ensure you have the following:
 ### 1. **Clone the Repository**
   ```bash
   git clone https://github.com/ryangoeglein/CloudUploader-CLI.git
-  cd CloudUploader_CLI
+  cd CloudUploader-CLI
   ```
 ### 2. **Azure Blob Storage Setup**
   Download or copy the clouduploader.sh script to your local machine (should have it accessible if you clone the repository)
