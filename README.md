@@ -1,94 +1,68 @@
-# CloudUploader-CLI 
+# CloudUploader CLI Tool
 
-CloudUploader CLI is a simple Bash-based tool for uploading files to Azure Blob Storage. It provides a seamless experience similar to popular cloud storage services by allowing users to upload files directly from the command line.
+CloudUploader is a command-line interface (CLI) tool designed to facilitate file uploads to Azure Blob Storage. This script allows users to quickly and easily upload files, either using an existing Azure Storage account or by creating a new one directly from the command line.
 
 ## Features
-- Upload files to Azure Blob Storage via a simple command.
-- Validation for file existence and Azure Storage credentials.
-- Error handling and user feedback on successful or failed uploads.
+- **User-friendly prompts** for configuration and file uploads.
+- **Progress bar** for monitoring upload status.
+- **Supports multiple uploads** without restarting the script.
+- **Cross-platform compatibility** with Linux and macOS.
+- **Azure CLI integration** for seamless interaction with Azure Blob Storage.
 
 ## Prerequisites
 Before you start, ensure you have the following:
 
 1. **Azure Subscription**: You will need an active Azure account and an Azure Storage account.
-2. **Azure CLI**: Install the Azure CLI to authenticate and interact with Azure Blob Storage. You can download and install it [here](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli).
+2. **Azure CLI**: Ensure you have the Azure CLI installed. Follow the installation instructions at [Install Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli).
 3. **Bash Shell**: This script is written for Bash, which is available by default on Linux and macOS. For Windows users, use WSL or Git Bash.
+4. **pv**: This tool is required for displaying upload progress. Install it using your package manager:
+   - **Debian/Ubuntu**: sudo apt install pv
+   - **Red Hat/CentOS**: sudo yum install pv
+   - **macOS**: brew install pv
 
-## Setup
+
+## Installation
 
 ### 1. **Clone the Repository**
-```bash
-git clone https://github.com/ryangoeglein/CloudUploader-CLI.git
-cd CloudUploader_CLI
-```
+  ```bash
+  git clone https://github.com/ryangoeglein/CloudUploader-CLI.git
+  cd CloudUploader_CLI
+  ```
 ### 2. **Azure Blob Storage Setup**
-Make sure you have an Azure Storage account and a Blob container ready for uploads. If not, follow these steps:
-- **Create an Azure Storage Account:**
+  Download or copy the clouduploader.sh script to your local machine (should have it accessible if you clone the repository)
+
+### 3. **Make the script executable:**
   ```bash
-  az storage account create --name <storage_account_name> --resource-group <resource_group> --location <location> --sku Standard_LRS
-  ```
-- **Create Create a Blob Container:**
-  ```bash
-  az storage container create --name <container_name> --account-name <storage_account_name>
-  ```
-### 3. **Set up Environment Variables**
-To securely store your Azure credentials, you need to set environment variables for your storage account name and key.
-  **Edit your** ~/.bashrc **file to add these variables:**
-  ```bash
-  export AZURE_STORAGE_ACCOUNT="your_storage_account_name"
-  export AZURE_STORAGE_KEY="your_storage_account_key"
-  ```
-Once added, run the following command to apply the changes:
-```bash
- source ~/.bashrc
-  ```
-You can verify the variables are set by running:
-```bash
-echo $AZURE_STORAGE_ACCOUNT
-echo $AZURE_STORAGE_KEY
-  ```
-### 4. **Authentication**
-Before running the script, authenticate to Azure using the Azure CLI:
-```bash
-  az login
+  chmod +x clouduploader.sh
   ```
 
 ## Usage
 
-### Basic Command
-To upload a file to Azure Blob Storage, use the following command:
-```bash
-  ./clouduploader.sh /path/to/file.txt
-  ```
-This command will upload the specified file to the blob container defined in the script.
-### Example
-```bash
-  ./clouduploader.sh ~/Documents/report.pdf
-  ```
-The file report.pdf will be uploaded to your Azure Blob container.
+1. Open the terminal
+2. Run the script:
+   ```bash
+    ./clouduploader.sh
+   ```
+3. Follow the prompts to authenticate with Azure and upload your files.
+4. When prompted for the file path, be sure to provide the path & filename.
+   - **Example:** ~/Documents/report.pdf
 
-### How It Works
-1. The script checks if the file exists.
-2. It ensures Azure credentials are available via environment variables.
-3. It uses the Azure CLI to upload the file to the specified Blob container.
-4. Provides feedback on the success or failure of the upload.
+## Configuration
+During the execution of the script, you will be prompted for the following information:
+- **Azure Resource Group:** The name of your Azure resource group.
+- **Storage Account Name:** The name of your existing or new Azure Storage account.
+- **Storage Account Access Key:** The access key for your storage account (input will be hidden).
+- **Storage Container Name:** The name of the container in which you want to upload the files.
+- **File Path:** The local path of the file you wish to upload.
 
-## Troubleshooting
-### Common Issues:
-1. **Environment Variables Not Set:**
-   - Ensure that the environment variables (AZURE_STORAGE_ACCOUNT and AZURE_STORAGE_KEY) are set in your ~/.bashrc or ~/.bash_profile.
-   - Check by running echo $AZURE_STORAGE_ACCOUNT and echo $AZURE_STORAGE_KEY to confirm.
-2. **File Not Found:**
-   - Ensure the file you are trying to upload exists and the path is correct. You can check the file's existence by running ls /path/to/file.
-3. **Azure CLI Not Installed:**
-   - Make sure the Azure CLI is installed and properly configured. Run az --version to verify the installation.
-4. **Authentication Issues:**
-   - If you're having trouble authenticating, run az login to ensure you're properly signed into your Azure account.
-5. **Permission Denied Errors:**
-   - If you receive permission errors when running the script, make sure the script has executable permissions:
-    ```bash
-    chmod +x clouduploader
-    ```
+## Examples
+### Uploading a File to an Existing Storage Account
+1. Choose to use an existing Azure Storage account when prompted.
+2. Provide the necessary information.
+3. Enter the file path to upload.
+
+### Creating a New Storage Account
+
 ## Next Steps & Future Enhancements
 - Add support for optional progress bars using tools like pv.
 - Provide an option to generate and display a shareable link post-upload.
