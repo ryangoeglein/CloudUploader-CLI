@@ -7,7 +7,6 @@ display_help() {
     echo "Options:"
     echo "  -h, --help            Show this help message."
     echo "  -a, --account         Use an existing Azure Storage account."
-    echo "  -c, --create          Create a new Azure Storage account."
     echo
     echo "This script allows you to upload files to Azure Blob Storage."
     echo "You will be prompted for authentication and account details."
@@ -23,6 +22,14 @@ check_azure_cli_installed() {
     fi
 }
 
+# Function to check if required environment variables are set
+check_environment_variables() {
+    if [[ -z "$AZURE_STORAGE_ACCOUNT" || -z "$AZURE_STORAGE_KEY" || -z "$AZURE_CONTAINER_NAME" ]]; then
+        echo "Required environment variables (AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_KEY, AZURE_CONTAINER_NAME) are not set."
+        exit 1
+    fi
+}
+
 # Function to prompt user to authenticate with Azure
 authenticate_azure() {
     echo "Authenticating with Azure..."
@@ -33,56 +40,12 @@ authenticate_azure() {
     fi
 }
 
-# Function to prompt user for input fields (existing or new account)
-get_user_input() {
-    read -p "Do you want to use an existing Azure Storage account? (y/n): " choice
-    case "$choice" in
-        y|Y ) use_existing_account;;
-        n|N ) create_storage_account;;
-        * ) echo "Invalid option. Exiting."; exit 1;;
-    esac
-}
-
 # Function to use an existing storage account from environment variables
 use_existing_account() {
-    # Read sensitive information from environment variables
-    if [[ -z "$AZURE_STORAGE_ACCOUNT" || -z "$AZURE_STORAGE_KEY" || -z "$AZURE_CONTAINER_NAME" ]]; then
-        echo "Required environment variables (AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_KEY, AZURE_CONTAINER_NAME) are not set."
-        exit 1
-    fi
-
     STORAGE_ACCOUNT="$AZURE_STORAGE_ACCOUNT"
     STORAGE_KEY="$AZURE_STORAGE_KEY"
     CONTAINER_NAME="$AZURE_CONTAINER_NAME"
     
-    prompt_file_path
-}
-
-# Function to create a new storage account
-create_storage_account() {
-    read -p "Enter a new resource group name: " RESOURCE_GROUP
-    az group create --name "$RESOURCE_GROUP" --location eastus
-    if [ $? -ne 0 ]; then
-        echo "Failed to create resource group. Exiting."
-        exit 1
-    fi
-
-    read -p "Enter a new Storage account name: " STORAGE_ACCOUNT
-    az storage account create --name "$STORAGE_ACCOUNT" --resource-group "$RESOURCE_GROUP" --location eastus --sku Standard_LRS
-    if [ $? -ne 0 ]; then
-        echo "Failed to create storage account. Exiting."
-        exit 1
-    fi
-
-    STORAGE_KEY=$(az storage account keys list --account-name "$STORAGE_ACCOUNT" --resource-group "$RESOURCE_GROUP" --query '[0].value' --output tsv)
-
-    read -p "Enter a new storage container name: " CONTAINER_NAME
-    az storage container create --name "$CONTAINER_NAME" --account-name "$STORAGE_ACCOUNT" --account-key "$STORAGE_KEY"
-    if [ $? -ne 0 ]; then
-        echo "Failed to create storage container. Exiting."
-        exit 1
-    fi
-
     prompt_file_path
 }
 
@@ -100,7 +63,7 @@ prompt_file_path() {
     upload_file
 }
 
-# Function to upload file to Azure Blob Storage
+# Function to upload file to Azure Blob Storage with progress
 upload_file() {
     echo "Checking if the file already exists in the container..."
     az storage blob exists \
@@ -118,14 +81,26 @@ upload_file() {
         esac
     fi
 
-    # Use 'az storage blob upload' to upload the file
+    # Show upload progress using 'pv'
     echo "Uploading file..."
-    az storage blob upload \
-        --account-name "$STORAGE_ACCOUNT" \
-        --account-key "$STORAGE_KEY" \
-        --container-name "$CONTAINER_NAME" \
-        --file "$FILE_PATH" \
-        --name "$(basename "$FILE_PATH")" --output table
+    FILE_SIZE=$(stat -c %s "$FILE_PATH")
+    if command -v pv &> /dev/null; then
+        {
+            az storage blob upload \
+                --account-name "$STORAGE_ACCOUNT" \
+                --account-key "$STORAGE_KEY" \
+                --container-name "$CONTAINER_NAME" \
+                --file "$FILE_PATH" \
+                --name "$(basename "$FILE_PATH")" --output table
+        } | pv -s "$FILE_SIZE" > /dev/null
+    else
+        az storage blob upload \
+            --account-name "$STORAGE_ACCOUNT" \
+            --account-key "$STORAGE_KEY" \
+            --container-name "$CONTAINER_NAME" \
+            --file "$FILE_PATH" \
+            --name "$(basename "$FILE_PATH")" --output table
+    fi
 
     if [ $? -eq 0 ]; then
         echo -e "\nFile uploaded successfully to Azure Blob Storage."
@@ -147,6 +122,17 @@ upload_more_files() {
     esac
 }
 
+# Cleanup function to run on exit
+cleanup() {
+    echo "Cleaning up..."
+    # Perform any necessary cleanup actions here (e.g., deleting temporary files)
+}
+
+# Trap to ensure cleanup happens on exit
+trap cleanup EXIT
+
 # Main script execution
 check_azure_cli_installed
-get_user_input
+check_environment_variables
+authenticate_azure
+use_existing_account
