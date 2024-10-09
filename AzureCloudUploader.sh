@@ -22,14 +22,6 @@ check_azure_cli_installed() {
     fi
 }
 
-# Function to check if required environment variables are set
-check_environment_variables() {
-    if [[ -z "$AZURE_STORAGE_ACCOUNT" || -z "$AZURE_STORAGE_KEY" || -z "$AZURE_CONTAINER_NAME" ]]; then
-        echo "Required environment variables (AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_KEY, AZURE_CONTAINER_NAME) are not set."
-        exit 1
-    fi
-}
-
 # Function to prompt user to authenticate with Azure
 authenticate_azure() {
     echo "Authenticating with Azure..."
@@ -40,8 +32,19 @@ authenticate_azure() {
     fi
 }
 
+# Function to prompt user for input fields for existing account
+get_user_input() {
+    use_existing_account
+}
+
 # Function to use an existing storage account from environment variables
 use_existing_account() {
+    # Read sensitive information from environment variables
+    if [[ -z "$AZURE_STORAGE_ACCOUNT" || -z "$AZURE_STORAGE_KEY" || -z "$AZURE_CONTAINER_NAME" ]]; then
+        echo "Required environment variables (AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_KEY, AZURE_CONTAINER_NAME) are not set."
+        exit 1
+    fi
+
     STORAGE_ACCOUNT="$AZURE_STORAGE_ACCOUNT"
     STORAGE_KEY="$AZURE_STORAGE_KEY"
     CONTAINER_NAME="$AZURE_CONTAINER_NAME"
@@ -63,7 +66,7 @@ prompt_file_path() {
     upload_file
 }
 
-# Function to upload file to Azure Blob Storage with progress
+# Function to upload file to Azure Blob Storage
 upload_file() {
     echo "Checking if the file already exists in the container..."
     az storage blob exists \
@@ -81,10 +84,34 @@ upload_file() {
         esac
     fi
 
-    # Show upload progress using 'pv'
-    echo "Uploading file..."
-    FILE_SIZE=$(stat -c %s "$FILE_PATH")
-    if command -v pv &> /dev/null; then
+    # Get the file size based on OS compatibility
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        FILE_SIZE=$(stat -c %s "$FILE_PATH")
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        FILE_SIZE=$(stat -f %z "$FILE_PATH")
+    else
+        echo "Unsupported OS type: $OSTYPE"
+        exit 1
+    fi
+
+    # Check if FILE_SIZE was set successfully
+    if [[ -z "$FILE_SIZE" ]]; then
+        echo "Failed to retrieve file size. Exiting."
+        exit 1
+    fi
+
+    # Check for 'pv' command
+    if ! command -v pv &> /dev/null; then
+        echo "pv command not found. Uploading without progress display."
+        # Use 'az storage blob upload' directly without 'pv'
+        az storage blob upload \
+            --account-name "$STORAGE_ACCOUNT" \
+            --account-key "$STORAGE_KEY" \
+            --container-name "$CONTAINER_NAME" \
+            --file "$FILE_PATH" \
+            --name "$(basename "$FILE_PATH")" --output table
+    else
+        # Use 'pv' to show progress
         {
             az storage blob upload \
                 --account-name "$STORAGE_ACCOUNT" \
@@ -93,13 +120,6 @@ upload_file() {
                 --file "$FILE_PATH" \
                 --name "$(basename "$FILE_PATH")" --output table
         } | pv -s "$FILE_SIZE" > /dev/null
-    else
-        az storage blob upload \
-            --account-name "$STORAGE_ACCOUNT" \
-            --account-key "$STORAGE_KEY" \
-            --container-name "$CONTAINER_NAME" \
-            --file "$FILE_PATH" \
-            --name "$(basename "$FILE_PATH")" --output table
     fi
 
     if [ $? -eq 0 ]; then
@@ -122,17 +142,6 @@ upload_more_files() {
     esac
 }
 
-# Cleanup function to run on exit
-cleanup() {
-    echo "Cleaning up..."
-    # Perform any necessary cleanup actions here (e.g., deleting temporary files)
-}
-
-# Trap to ensure cleanup happens on exit
-trap cleanup EXIT
-
 # Main script execution
 check_azure_cli_installed
-check_environment_variables
-authenticate_azure
-use_existing_account
+get_user_input
