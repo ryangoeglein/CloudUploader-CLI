@@ -9,8 +9,8 @@ display_help() {
     echo "  -a, --account         Use an existing Azure Storage account."
     echo "  -c, --create          Create a new Azure Storage account."
     echo
-    echo "This script allows you to upload files to Azure Blob Storage."
-    echo "You will be prompted for authentication and account details."
+    echo "This script allows you to upload files to Azure Blob Storage using Service Principal authentication."
+    echo "If a Service Principal does not exist, it will create one for you."
     echo
     exit 0
 }
@@ -23,10 +23,60 @@ check_azure_cli_installed() {
     fi
 }
 
-# Function to prompt user to authenticate with Azure
+# Function to create a Service Principal if it doesn't exist
+create_service_principal() {
+    read -p "Enter a name for the Service Principal: " SP_NAME
+    echo "Checking if Service Principal exists..."
+
+    # Check if the Service Principal exists
+    SP_EXISTS=$(az ad sp list --display-name "$SP_NAME" --query '[].appId' --output tsv)
+
+    if [ -z "$SP_EXISTS" ]; then
+        echo "Service Principal does not exist. Creating a new Service Principal..."
+
+        # Create Service Principal
+        SP_CREDENTIALS=$(az ad sp create-for-rbac --name "$SP_NAME" --role contributor --scopes /subscriptions/<Your-Subscription-ID> --output json)
+
+        if [ $? -ne 0 ]; then
+            echo "Failed to create Service Principal. Exiting."
+            exit 1
+        fi
+
+        # Extract Service Principal details
+        SP_APP_ID=$(echo "$SP_CREDENTIALS" | jq -r '.appId')
+        SP_PASSWORD=$(echo "$SP_CREDENTIALS" | jq -r '.password')
+        SP_TENANT=$(echo "$SP_CREDENTIALS" | jq -r '.tenant')
+
+        echo "Service Principal created successfully."
+        echo "App ID (Client ID): $SP_APP_ID"
+        echo "Password (Client Secret): $SP_PASSWORD"
+        echo "Tenant ID: $SP_TENANT"
+    else
+        echo "Service Principal already exists."
+        read -p "Do you want to continue using this existing Service Principal? (y/n): " choice
+        case "$choice" in
+            y|Y )
+                SP_APP_ID=$SP_EXISTS
+                read -sp "Enter the existing Service Principal password: " SP_PASSWORD
+                echo
+                read -p "Enter the existing Tenant ID: " SP_TENANT
+                ;;
+            n|N )
+                echo "Exiting script. Please create a new Service Principal or modify your existing one."
+                exit 0
+                ;;
+            * )
+                echo "Invalid option. Exiting."
+                exit 1
+                ;;
+        esac
+    fi
+}
+
+# Function to authenticate with Azure using Service Principal
 authenticate_azure() {
-    echo "Please authenticate with Azure CLI..."
-    az login
+    # Login using Service Principal
+    az login --service-principal --username "$SP_APP_ID" --password "$SP_PASSWORD" --tenant "$SP_TENANT"
     if [ $? -ne 0 ]; then
         echo "Azure authentication failed. Exiting."
         exit 1
@@ -159,49 +209,4 @@ upload_file() {
     fi
 
     # Check for 'pv' command
-    if ! command -v pv &> /dev/null; then
-        echo "pv command not found. Uploading without progress display."
-        # Use 'az storage blob upload' directly without 'pv'
-        az storage blob upload \
-            --account-name "$STORAGE_ACCOUNT" \
-            --container-name "$CONTAINER_NAME" \
-            --file "$FILE_PATH" \
-            --name "$(basename "$FILE_PATH")" --output table
-    else
-        # Use 'pv' to show progress
-        {
-            echo "Starting upload..."
-            az storage blob upload \
-                --account-name "$STORAGE_ACCOUNT" \
-                --container-name "$CONTAINER_NAME" \
-                --file "$FILE_PATH" \
-                --name "$(basename "$FILE_PATH")" --output table
-        } | pv -s "$FILE_SIZE" > /dev/null
-    fi
-
-    if [ $? -eq 0 ]; then
-        echo -e "\nFile uploaded successfully to Azure Blob Storage."
-    else
-        echo -e "\nFile upload failed. Exiting."
-        exit 1
-    fi
-
-    # Ask if the user wants to upload another file
-    upload_more_files
-}
-
-# Function to ask if the user wants to upload more files
-upload_more_files() {
-    read -p "Do you want to upload another file? (y/n): " choice
-    case "$choice" in
-        y|Y ) prompt_file_path;;
-        n|N ) echo "Exiting script."; exit 0;;
-        * ) echo "Invalid option. Exiting."; exit 1;;
-    esac
-}
-
-# Main script execution
-check_azure_cli_installed
-authenticate_azure
-get_user_input
-upload_file
+    if ! command -v pv &> /dev/null;
