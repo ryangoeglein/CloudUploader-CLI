@@ -213,4 +213,42 @@ upload_file() {
         echo "pv command not found. Uploading without progress display."
         # Use 'az storage blob upload' directly without 'pv'
         az storage blob upload \
-            --account-name "$STORAGE_ACCOUNT"
+            --account-name "$STORAGE_ACCOUNT" \
+            --container-name "$CONTAINER_NAME" \
+            --file "$FILE_PATH" \
+            --name "$(basename "$FILE_PATH")"
+
+        if [ $? -eq 0 ]; then
+            echo "File uploaded successfully."
+        else
+            echo "Failed to upload the file."
+            exit 1
+        fi
+    else
+        # If 'pv' exists, show progress
+        pv "$FILE_PATH" | az storage blob upload \
+            --account-name "$STORAGE_ACCOUNT" \
+            --container-name "$CONTAINER_NAME" \
+            --file "$FILE_PATH" \
+            --name "$(basename "$FILE_PATH")"
+
+        if [ $? -eq 0 ]; then
+            echo "File uploaded successfully with progress."
+        else
+            echo "Failed to upload the file."
+            exit 1
+        fi
+    fi
+}
+
+# Main script execution
+check_azure_cli_installed
+
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    display_help
+fi
+
+create_service_principal
+authenticate_azure
+get_user_input
+upload_file
