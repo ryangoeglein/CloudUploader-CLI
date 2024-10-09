@@ -9,8 +9,8 @@ display_help() {
     echo "  -a, --account         Use an existing Azure Storage account."
     echo "  -c, --create          Create a new Azure Storage account."
     echo
-    echo "This script allows you to upload files to Azure Blob Storage using Service Principal authentication."
-    echo "If a Service Principal does not exist, it will create one for you."
+    echo "This script allows you to upload files to Azure Blob Storage."
+    echo "You will be prompted for authentication and account details."
     echo
     exit 0
 }
@@ -25,60 +25,37 @@ check_azure_cli_installed() {
 
 # Function to create a Service Principal if it doesn't exist
 create_service_principal() {
-    read -p "Enter a name for the Service Principal: " SP_NAME
-    echo "Checking if Service Principal exists..."
-
-    # Check if the Service Principal exists
+    read -p "Enter Service Principal Name: " SP_NAME
+    echo "Checking if Service Principal $SP_NAME exists..."
     SP_EXISTS=$(az ad sp list --display-name "$SP_NAME" --query '[].appId' --output tsv)
-
-    if [ -z "$SP_EXISTS" ]; then
-        echo "Service Principal does not exist. Creating a new Service Principal..."
-
-        # Create Service Principal
-        SP_CREDENTIALS=$(az ad sp create-for-rbac --name "$SP_NAME" --role contributor --scopes /subscriptions/<Your-Subscription-ID> --output json)
-
-        if [ $? -ne 0 ]; then
-            echo "Failed to create Service Principal. Exiting."
-            exit 1
-        fi
-
-        # Extract Service Principal details
-        SP_APP_ID=$(echo "$SP_CREDENTIALS" | jq -r '.appId')
-        SP_PASSWORD=$(echo "$SP_CREDENTIALS" | jq -r '.password')
-        SP_TENANT=$(echo "$SP_CREDENTIALS" | jq -r '.tenant')
-
-        echo "Service Principal created successfully."
-        echo "App ID (Client ID): $SP_APP_ID"
-        echo "Password (Client Secret): $SP_PASSWORD"
-        echo "Tenant ID: $SP_TENANT"
+    
+    if [[ -z "$SP_EXISTS" ]]; then
+        echo "Creating new Service Principal: $SP_NAME..."
+        SP_CREDENTIALS=$(az ad sp create-for-rbac --name "$SP_NAME" --role "Storage Blob Data Contributor" --scopes /subscriptions/"$SUBSCRIPTION_ID" --output json)
+        CLIENT_ID=$(echo "$SP_CREDENTIALS" | jq -r .appId)
+        CLIENT_SECRET=$(echo "$SP_CREDENTIALS" | jq -r .password)
+        TENANT_ID=$(echo "$SP_CREDENTIALS" | jq -r .tenant)
+        
+        echo "Service Principal $SP_NAME created."
+        echo "Client ID: $CLIENT_ID"
+        echo "Tenant ID: $TENANT_ID"
+        echo "Client Secret: [Hidden]"
+        
+        # Set environment variables to use the service principal for authentication
+        export AZURE_CLIENT_ID="$CLIENT_ID"
+        export AZURE_TENANT_ID="$TENANT_ID"
+        export AZURE_CLIENT_SECRET="$CLIENT_SECRET"
     else
-        echo "Service Principal already exists."
-        read -p "Do you want to continue using this existing Service Principal? (y/n): " choice
-        case "$choice" in
-            y|Y )
-                SP_APP_ID=$SP_EXISTS
-                read -sp "Enter the existing Service Principal password: " SP_PASSWORD
-                echo
-                read -p "Enter the existing Tenant ID: " SP_TENANT
-                ;;
-            n|N )
-                echo "Exiting script. Please create a new Service Principal or modify your existing one."
-                exit 0
-                ;;
-            * )
-                echo "Invalid option. Exiting."
-                exit 1
-                ;;
-        esac
+        echo "Service Principal $SP_NAME already exists. Proceeding with existing credentials."
     fi
 }
 
-# Function to authenticate with Azure using Service Principal
-authenticate_azure() {
-    # Login using Service Principal
-    az login --service-principal --username "$SP_APP_ID" --password "$SP_PASSWORD" --tenant "$SP_TENANT"
+# Function to authenticate using the Service Principal
+authenticate_with_sp() {
+    echo "Authenticating with Service Principal..."
+    az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
     if [ $? -ne 0 ]; then
-        echo "Azure authentication failed. Exiting."
+        echo "Service Principal authentication failed. Exiting."
         exit 1
     fi
 }
@@ -133,44 +110,6 @@ prompt_file_path() {
         read -p "Enter the file path to upload: " FILE_PATH
         if [ -f "$FILE_PATH" ]; then
             # Check for allowed file types
-            if [[ "$FILE_PATH" != *.txt && 
-                  "$FILE_PATH" != *.jpg && 
-                  "$FILE_PATH" != *.jpeg && 
-                  "$FILE_PATH" != *.png && 
-                  "$FILE_PATH" != *.gif && 
-                  "$FILE_PATH" != *.bmp && 
-                  "$FILE_PATH" != *.tiff && 
-                  "$FILE_PATH" != *.pdf && 
-                  "$FILE_PATH" != *.doc && 
-                  "$FILE_PATH" != *.docx && 
-                  "$FILE_PATH" != *.xls && 
-                  "$FILE_PATH" != *.xlsx && 
-                  "$FILE_PATH" != *.ppt && 
-                  "$FILE_PATH" != *.pptx && 
-                  "$FILE_PATH" != *.zip && 
-                  "$FILE_PATH" != *.tar && 
-                  "$FILE_PATH" != *.gz && 
-                  "$FILE_PATH" != *.rar && 
-                  "$FILE_PATH" != *.7z && 
-                  "$FILE_PATH" != *.mp3 && 
-                  "$FILE_PATH" != *.wav && 
-                  "$FILE_PATH" != *.aac && 
-                  "$FILE_PATH" != *.flac && 
-                  "$FILE_PATH" != *.ogg && 
-                  "$FILE_PATH" != *.mp4 && 
-                  "$FILE_PATH" != *.avi && 
-                  "$FILE_PATH" != *.mov && 
-                  "$FILE_PATH" != *.wmv && 
-                  "$FILE_PATH" != *.mkv && 
-                  "$FILE_PATH" != *.json && 
-                  "$FILE_PATH" != *.xml && 
-                  "$FILE_PATH" != *.csv && 
-                  "$FILE_PATH" != *.html && 
-                  "$FILE_PATH" != *.css && 
-                  "$FILE_PATH" != *.js ]]; then
-                echo "Invalid file type: $FILE_PATH. Allowed types are .txt, .jpg, .jpeg, .png, .gif, .bmp, .tiff, .pdf, .doc, .docx, .xls, .xlsx, .ppt, .pptx, .zip, .tar, .gz, .rar, .7z, .mp3, .wav, .aac, .flac, .ogg, .mp4, .avi, .mov, .wmv, .mkv, .json, .xml, .csv, .html, .css, .js"
-                continue
-            fi
             break
         else
             echo "File not found: $FILE_PATH. Please enter a valid file path."
@@ -195,49 +134,18 @@ upload_file() {
         esac
     fi
 
-    # Show progress bar during upload
     echo "Uploading file..."
+    az storage blob upload \
+        --account-name "$STORAGE_ACCOUNT" \
+        --container-name "$CONTAINER_NAME" \
+        --file "$FILE_PATH" \
+        --name "$(basename "$FILE_PATH")"
 
-    # Use 'stat' to get the file size in bytes, with OS compatibility
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        FILE_SIZE=$(stat -c %s "$FILE_PATH")
-    elif [[ "$OSTYPE" == "darwin"* ]]; then
-        FILE_SIZE=$(stat -f %z "$FILE_PATH")
+    if [ $? -eq 0 ]; then
+        echo -e "\nFile uploaded successfully to Azure Blob Storage."
     else
-        echo "Unsupported OS type: $OSTYPE"
+        echo -e "\nFile upload failed. Exiting."
         exit 1
-    fi
-
-    # Check for 'pv' command
-    if ! command -v pv &> /dev/null; then
-        echo "pv command not found. Uploading without progress display."
-        # Use 'az storage blob upload' directly without 'pv'
-        az storage blob upload \
-            --account-name "$STORAGE_ACCOUNT" \
-            --container-name "$CONTAINER_NAME" \
-            --file "$FILE_PATH" \
-            --name "$(basename "$FILE_PATH")"
-
-        if [ $? -eq 0 ]; then
-            echo "File uploaded successfully."
-        else
-            echo "Failed to upload the file."
-            exit 1
-        fi
-    else
-        # If 'pv' exists, show progress
-        pv "$FILE_PATH" | az storage blob upload \
-            --account-name "$STORAGE_ACCOUNT" \
-            --container-name "$CONTAINER_NAME" \
-            --file "$FILE_PATH" \
-            --name "$(basename "$FILE_PATH")"
-
-        if [ $? -eq 0 ]; then
-            echo "File uploaded successfully with progress."
-        else
-            echo "Failed to upload the file."
-            exit 1
-        fi
     fi
 }
 
@@ -248,7 +156,10 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     display_help
 fi
 
+# Prompt for subscription ID to use for role assignments
+read -p "Enter your Azure Subscription ID: " SUBSCRIPTION_ID
+
 create_service_principal
-authenticate_azure
+authenticate_with_sp
 get_user_input
 upload_file
