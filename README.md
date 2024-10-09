@@ -51,7 +51,6 @@ Before you start, ensure you have the following:
 During the execution of the script, you will be prompted for the following information:
 - **Azure Resource Group:** The name of your Azure resource group.
 - **Storage Account Name:** The name of your existing or new Azure Storage account.
-- **Storage Account Access Key:** The access key for your storage account (input will be hidden).
 - **Storage Container Name:** The name of the container in which you want to upload the files.
 - **File Path:** The local path of the file you wish to upload.
 
@@ -62,7 +61,9 @@ During the execution of the script, you will be prompted for the following infor
 3. Enter the file path to upload.
 
 ### Creating a New Storage Account
-
+1. Choose to create a new Azure Storage account when prompted.
+2. Follow the prompts to set up the resource group, storage account, and container.
+3. Enter the file path to upload.
 ## Next Steps & Future Enhancements
 - Add support for optional progress bars using tools like pv.
 - Provide an option to generate and display a shareable link post-upload.
@@ -70,12 +71,15 @@ During the execution of the script, you will be prompted for the following infor
 - Encrypt files for added security before uploading.
 
 ## Contributing
-Feel free to fork this repository and submit pull requests with improvements, additional features, or bug fixes.
+Contributions are welcome! If you have suggestions for improvements or new features, feel free to submit an issue or a pull request.
 
 ## Licsense
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/ryangoeglein/CloudUploader-CLI/blob/eb6e8b0e21e962a2504d65e442f0a54887f4c346/License) file for details.
 
-
+## Acknowledgments
+- [Learn to Cloud](https://learntocloud.guide/phase1/)
+- [Azure CLI Documentation](https://learn.microsoft.com/en-us/cli/azure/)
+- [Pipe Viewer (pv) Documentation](https://www.ivarch.com/programs/quickref/pv.shtml)
 
 
 
