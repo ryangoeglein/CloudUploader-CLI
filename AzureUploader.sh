@@ -84,20 +84,39 @@ upload_file() {
         esac
     fi
 
+    # Show progress bar during upload
     echo "Uploading file..."
-    az storage blob upload \
-        --account-name "$STORAGE_ACCOUNT" \
-        --account-key "$STORAGE_KEY" \
-        --container-name "$CONTAINER_NAME" \
-        --file "$FILE_PATH" \
-        --name "$(basename "$FILE_PATH")"
+    
+    # Use 'pv' to show progress (make sure pv is installed)
+    {
+        echo "Starting upload..."
+        az storage blob upload \
+            --account-name "$STORAGE_ACCOUNT" \
+            --account-key "$STORAGE_KEY" \
+            --container-name "$CONTAINER_NAME" \
+            --file "$FILE_PATH" \
+            --name "$(basename "$FILE_PATH")" --output table
+    } | pv -s $(du -b "$FILE_PATH" | awk '{print $1}') > /dev/null
 
     if [ $? -eq 0 ]; then
-        echo "File uploaded successfully to Azure Blob Storage."
+        echo -e "\nFile uploaded successfully to Azure Blob Storage."
     else
-        echo "File upload failed. Exiting."
+        echo -e "\nFile upload failed. Exiting."
         exit 1
     fi
+
+    # Ask if the user wants to upload another file
+    upload_more_files
+}
+
+# Function to prompt user for uploading more files
+upload_more_files() {
+    read -p "Would you like to upload another file? (y/n): " choice
+    case "$choice" in
+        y|Y ) prompt_file_path; upload_file;;
+        n|N ) echo "Exiting."; exit 0;;
+        * ) echo "Invalid option. Exiting."; exit 1;;
+    esac
 }
 
 # Main script starts here
