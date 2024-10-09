@@ -26,6 +26,8 @@ Before you start, ensure you have the following:
 ### 1. **Clone the Repository**
   ```bash
   git clone https://github.com/ryangoeglein/CloudUploader-CLI.git
+
+   cd CloudUploader-CLI
   ```
 
 ### 2. **Make the script executable:**
@@ -52,13 +54,11 @@ export AZURE_CONTAINER_NAME="your_container_name"
    ```bash
     ./clouduploader.sh
    ```
-5. Follow the prompts to authenticate with Azure and upload your files.
-6. When prompted for the file path, be sure to provide the path & filename.
-   - **Example:** ~/Documents/report.pdf
+5. Follow the prompts to authenticate with Azure and upload your files
 
 
 ## Example
-to upload a file named example.txt:
+To upload a file named example.txt:
 1. Make sure the environment variables are set.
 2. Run the script.
 3. Enter the file path when prompted.
