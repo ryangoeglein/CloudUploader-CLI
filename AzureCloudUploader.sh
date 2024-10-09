@@ -209,4 +209,8 @@ upload_file() {
     fi
 
     # Check for 'pv' command
-    if ! command -v pv &> /dev/null;
+    if ! command -v pv &> /dev/null; then
+        echo "pv command not found. Uploading without progress display."
+        # Use 'az storage blob upload' directly without 'pv'
+        az storage blob upload \
+            --account-name "$STORAGE_ACCOUNT"
