@@ -1,13 +1,13 @@
-# CloudUploader CLI Tool
+# Cloud Uploader CLI Tool
 
-CloudUploader is a command-line interface (CLI) tool designed to facilitate file uploads to Azure Blob Storage. This script allows users to quickly and easily upload files, either using an existing Azure Storage account or by creating a new one directly from the command line.
+CloudUploader is a command-line interface (CLI) tool designed to facilitate file uploads to Azure Blob Storage. It includes user authentication, file path validation, and options for overwriting existing files.
+
 
 ## Features
-- **User-friendly prompts** for configuration and file uploads.
-- **Progress bar** for monitoring upload status.
-- **Supports multiple uploads** without restarting the script.
-- **Cross-platform compatibility** with Linux and macOS.
-- **Azure CLI integration** for seamless interaction with Azure Blob Storage.
+- Authenticate with Azure using the Azure CLI.
+- Upload files to a specified Azure Blob Storage container.
+- Check for existing files and prompt for overwrite.
+- Display upload progress using `pv` (if available).
 
 ## Prerequisites
 Before you start, ensure you have the following:
@@ -26,46 +26,45 @@ Before you start, ensure you have the following:
 ### 1. **Clone the Repository**
   ```bash
   git clone https://github.com/ryangoeglein/CloudUploader-CLI.git
-  cd CloudUploader-CLI
   ```
-### 2. **Azure Blob Storage Setup**
-  Download or copy the clouduploader.sh script to your local machine (should have it accessible if you clone the repository)
 
-### 3. **Make the script executable:**
+### 2. **Make the script executable:**
   ```bash
   chmod +x clouduploader.sh
   ```
 
+## Environment Variables
+Set the following environment variables in your terminal before running the script:
+```bash
+export AZURE_STORAGE_ACCOUNT="your_account_name"
+export AZURE_STORAGE_KEY="your_account_key"
+export AZURE_CONTAINER_NAME="your_container_name"
+```
+
 ## Usage
 
 1. Open the terminal
-2. Run the script:
+2. Navigate to the directory containing the script.
+    ```bash
+   cd CloudUploader-CLI
+    ```
+4. Run the script:
    ```bash
     ./clouduploader.sh
    ```
-3. Follow the prompts to authenticate with Azure and upload your files.
-4. When prompted for the file path, be sure to provide the path & filename.
+5. Follow the prompts to authenticate with Azure and upload your files.
+6. When prompted for the file path, be sure to provide the path & filename.
    - **Example:** ~/Documents/report.pdf
 
-## Configuration
-During the execution of the script, you will be prompted for the following information:
-- **Azure Resource Group:** The name of your Azure resource group.
-- **Storage Account Name:** The name of your existing or new Azure Storage account.
-- **Storage Container Name:** The name of the container in which you want to upload the files.
-- **File Path:** The local path of the file you wish to upload.
 
-## Examples
-### Uploading a File to an Existing Storage Account
-1. Choose to use an existing Azure Storage account when prompted.
-2. Provide the necessary information.
-3. Enter the file path to upload.
+## Example
+to upload a file named example.txt:
+1. Make sure the environment variables are set.
+2. Run the script.
+3. Enter the file path when prompted.
+    - **Example:** ~/Documents/report.pdf
 
-### Creating a New Storage Account
-1. Choose to create a new Azure Storage account when prompted.
-2. Follow the prompts to set up the resource group, storage account, and container.
-3. Enter the file path to upload.
 ## Next Steps & Future Enhancements
-- Add support for optional progress bars using tools like pv.
 - Provide an option to generate and display a shareable link post-upload.
 - Implement file synchronization (overwrite, skip, rename).
 - Encrypt files for added security before uploading.
