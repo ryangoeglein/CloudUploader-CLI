@@ -23,44 +23,17 @@ check_azure_cli_installed() {
     fi
 }
 
-# Function to create a Service Principal if it doesn't exist
-create_service_principal() {
-    read -p "Enter Service Principal Name: " SP_NAME
-    echo "Checking if Service Principal $SP_NAME exists..."
-    SP_EXISTS=$(az ad sp list --display-name "$SP_NAME" --query '[].appId' --output tsv)
-    
-    if [[ -z "$SP_EXISTS" ]]; then
-        echo "Creating new Service Principal: $SP_NAME..."
-        SP_CREDENTIALS=$(az ad sp create-for-rbac --name "$SP_NAME" --role "Storage Blob Data Contributor" --scopes /subscriptions/"$SUBSCRIPTION_ID" --output json)
-        CLIENT_ID=$(echo "$SP_CREDENTIALS" | jq -r .appId)
-        CLIENT_SECRET=$(echo "$SP_CREDENTIALS" | jq -r .password)
-        TENANT_ID=$(echo "$SP_CREDENTIALS" | jq -r .tenant)
-        
-        echo "Service Principal $SP_NAME created."
-        echo "Client ID: $CLIENT_ID"
-        echo "Tenant ID: $TENANT_ID"
-        echo "Client Secret: [Hidden]"
-        
-        # Set environment variables to use the service principal for authentication
-        export AZURE_CLIENT_ID="$CLIENT_ID"
-        export AZURE_TENANT_ID="$TENANT_ID"
-        export AZURE_CLIENT_SECRET="$CLIENT_SECRET"
-    else
-        echo "Service Principal $SP_NAME already exists. Proceeding with existing credentials."
-    fi
-}
-
-# Function to authenticate using the Service Principal
-authenticate_with_sp() {
-    echo "Authenticating with Service Principal..."
-    az login --service-principal -u "$AZURE_CLIENT_ID" -p "$AZURE_CLIENT_SECRET" --tenant "$AZURE_TENANT_ID"
+# Function to prompt user to authenticate with Azure
+authenticate_azure() {
+    echo "Authenticating with Azure..."
+    az login
     if [ $? -ne 0 ]; then
-        echo "Service Principal authentication failed. Exiting."
+        echo "Azure authentication failed. Exiting."
         exit 1
     fi
 }
 
-# Function to prompt user for input fields
+# Function to prompt user for input fields (existing or new account)
 get_user_input() {
     read -p "Do you want to use an existing Azure Storage account? (y/n): " choice
     case "$choice" in
@@ -70,11 +43,18 @@ get_user_input() {
     esac
 }
 
-# Function to use an existing storage account
+# Function to use an existing storage account from environment variables
 use_existing_account() {
-    read -p "Enter your Azure resource group name: " RESOURCE_GROUP
-    read -p "Enter your Azure Storage account name: " STORAGE_ACCOUNT
-    read -p "Enter your Azure storage container name: " CONTAINER_NAME
+    # Read sensitive information from environment variables
+    if [[ -z "$AZURE_STORAGE_ACCOUNT" || -z "$AZURE_STORAGE_KEY" || -z "$AZURE_CONTAINER_NAME" ]]; then
+        echo "Required environment variables (AZURE_STORAGE_ACCOUNT, AZURE_STORAGE_KEY, AZURE_CONTAINER_NAME) are not set."
+        exit 1
+    fi
+
+    STORAGE_ACCOUNT="$AZURE_STORAGE_ACCOUNT"
+    STORAGE_KEY="$AZURE_STORAGE_KEY"
+    CONTAINER_NAME="$AZURE_CONTAINER_NAME"
+    
     prompt_file_path
 }
 
@@ -94,8 +74,10 @@ create_storage_account() {
         exit 1
     fi
 
+    STORAGE_KEY=$(az storage account keys list --account-name "$STORAGE_ACCOUNT" --resource-group "$RESOURCE_GROUP" --query '[0].value' --output tsv)
+
     read -p "Enter a new storage container name: " CONTAINER_NAME
-    az storage container create --name "$CONTAINER_NAME" --account-name "$STORAGE_ACCOUNT"
+    az storage container create --name "$CONTAINER_NAME" --account-name "$STORAGE_ACCOUNT" --account-key "$STORAGE_KEY"
     if [ $? -ne 0 ]; then
         echo "Failed to create storage container. Exiting."
         exit 1
@@ -109,12 +91,13 @@ prompt_file_path() {
     while true; do
         read -p "Enter the file path to upload: " FILE_PATH
         if [ -f "$FILE_PATH" ]; then
-            # Check for allowed file types
             break
         else
             echo "File not found: $FILE_PATH. Please enter a valid file path."
         fi
     done
+
+    upload_file
 }
 
 # Function to upload file to Azure Blob Storage
@@ -122,6 +105,7 @@ upload_file() {
     echo "Checking if the file already exists in the container..."
     az storage blob exists \
         --account-name "$STORAGE_ACCOUNT" \
+        --account-key "$STORAGE_KEY" \
         --container-name "$CONTAINER_NAME" \
         --name "$(basename "$FILE_PATH")" --output tsv | grep -q true
 
@@ -134,12 +118,14 @@ upload_file() {
         esac
     fi
 
+    # Use 'az storage blob upload' to upload the file
     echo "Uploading file..."
     az storage blob upload \
         --account-name "$STORAGE_ACCOUNT" \
+        --account-key "$STORAGE_KEY" \
         --container-name "$CONTAINER_NAME" \
         --file "$FILE_PATH" \
-        --name "$(basename "$FILE_PATH")"
+        --name "$(basename "$FILE_PATH")" --output table
 
     if [ $? -eq 0 ]; then
         echo -e "\nFile uploaded successfully to Azure Blob Storage."
@@ -147,19 +133,20 @@ upload_file() {
         echo -e "\nFile upload failed. Exiting."
         exit 1
     fi
+
+    upload_more_files
+}
+
+# Function to ask if the user wants to upload more files
+upload_more_files() {
+    read -p "Do you want to upload another file? (y/n): " choice
+    case "$choice" in
+        y|Y ) prompt_file_path;;
+        n|N ) echo "Exiting script."; exit 0;;
+        * ) echo "Invalid option. Exiting."; exit 1;;
+    esac
 }
 
 # Main script execution
 check_azure_cli_installed
-
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-    display_help
-fi
-
-# Prompt for subscription ID to use for role assignments
-read -p "Enter your Azure Subscription ID: " SUBSCRIPTION_ID
-
-create_service_principal
-authenticate_with_sp
 get_user_input
-upload_file
