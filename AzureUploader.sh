@@ -86,8 +86,18 @@ upload_file() {
 
     # Show progress bar during upload
     echo "Uploading file..."
-    
-    # Use 'pv' to show progress (make sure pv is installed)
+
+    # Use 'stat' to get the file size in bytes, with OS compatibility
+    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        FILE_SIZE=$(stat -c %s "$FILE_PATH")
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        FILE_SIZE=$(stat -f %z "$FILE_PATH")
+    else
+        echo "Unsupported OS type: $OSTYPE"
+        exit 1
+    fi
+
+    # Use 'pv' to show progress
     {
         echo "Starting upload..."
         az storage blob upload \
@@ -96,7 +106,7 @@ upload_file() {
             --container-name "$CONTAINER_NAME" \
             --file "$FILE_PATH" \
             --name "$(basename "$FILE_PATH")" --output table
-    } | pv -s $(du -b "$FILE_PATH" | awk '{print $1}') > /dev/null
+    } | pv -s "$FILE_SIZE" > /dev/null
 
     if [ $? -eq 0 ]; then
         echo -e "\nFile uploaded successfully to Azure Blob Storage."
